@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MyRemember — 문서 모음</title>
+<style>
+  :root{
+    --bg:#eef1ef; --bg-raised:#ffffff; --bg-sunk:#e4e8e5;
+    --ink:#15201d; --ink-dim:#56635f; --ink-faint:#8b968f;
+    --accent:#a06a12; --accent-ink:#5c3d0a;
+    --live:#c0322c; --live-bg:rgba(192,50,44,.10);
+    --ok:#1f9a56; --ok-bg:rgba(31,154,86,.10);
+    --plan:#a06a12; --plan-bg:rgba(160,106,18,.12);
+    --snap:#4a6fa5; --snap-bg:rgba(74,111,165,.12);
+    --line:rgba(21,32,29,.14); --line-strong:rgba(21,32,29,.28);
+    --shadow: 0 1px 2px rgba(21,32,29,.06), 0 8px 24px rgba(21,32,29,.05);
+    --mono: ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard", "Malgun Gothic", "Segoe UI", sans-serif;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#0c1012; --bg-raised:#141b1e; --bg-sunk:#0a0e10;
+      --ink:#e8ece9; --ink-dim:#9aa6a2; --ink-faint:#5e6a66;
+      --accent:#e2a63d; --accent-ink:#f4c877;
+      --live:#e0453f; --live-bg:rgba(224,69,63,.14);
+      --ok:#3fcf7a; --ok-bg:rgba(63,207,122,.13);
+      --plan:#e2a63d; --plan-bg:rgba(226,166,61,.14);
+      --snap:#7da7dd; --snap-bg:rgba(125,167,221,.14);
+      --line:rgba(232,236,233,.12); --line-strong:rgba(232,236,233,.24);
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 12px 28px rgba(0,0,0,.35);
+    }
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{ background:var(--bg); color:var(--ink); font-family:var(--sans); line-height:1.6; -webkit-font-smoothing:antialiased; }
+  ::selection{ background:var(--accent); color:var(--bg-sunk); }
+
+  .page{ max-width:920px; margin:0 auto; padding:48px 22px 100px; }
+
+  .eyebrow{
+    font-family:var(--mono); font-size:11px; letter-spacing:.14em; text-transform:uppercase;
+    color:var(--accent-ink); display:flex; align-items:center; gap:8px; margin:0 0 10px;
+  }
+  .eyebrow::before{ content:""; width:7px; height:7px; border-radius:50%; background:var(--accent); flex:none; }
+
+  h1{ font-size:clamp(23px,3vw,30px); line-height:1.3; margin:0 0 8px; font-weight:800; letter-spacing:-.01em; }
+  .lede{ color:var(--ink-dim); font-size:14px; max-width:64ch; margin:0 0 6px; }
+  .back{ font-size:12.5px; color:var(--ink-faint); text-decoration:none; }
+  .back:hover{ color:var(--accent); }
+
+  /* filter */
+  .filter-wrap{ margin:26px 0 8px; position:sticky; top:0; padding:12px 0; background:var(--bg); z-index:5; }
+  #filter{
+    width:100%; padding:11px 16px; font-size:14px; font-family:var(--sans);
+    border:1px solid var(--line-strong); border-radius:8px; background:var(--bg-raised); color:var(--ink);
+    outline:none;
+  }
+  #filter:focus{ border-color:var(--accent); box-shadow:0 0 0 3px rgba(160,106,18,.15); }
+  .filter-hint{ font-size:11.5px; color:var(--ink-faint); margin-top:6px; font-family:var(--mono); }
+
+  section{ margin:36px 0; }
+  h2{ font-size:17px; margin:0 0 4px; font-weight:800; display:flex; align-items:baseline; gap:10px; }
+  h2 .folder{ font-family:var(--mono); font-size:12px; font-weight:400; color:var(--ink-faint); }
+  .section-desc{ color:var(--ink-dim); font-size:13px; margin:0 0 14px; }
+
+  .doc-list{ display:flex; flex-direction:column; gap:10px; }
+  a.doc{
+    display:grid; grid-template-columns:1fr auto; gap:4px 14px; align-items:start;
+    padding:14px 18px; border:1px solid var(--line); border-radius:9px;
+    background:var(--bg-raised); box-shadow:var(--shadow);
+    text-decoration:none; color:var(--ink); transition:border-color .12s;
+  }
+  a.doc:hover{ border-color:var(--accent); }
+  a.doc:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
+  .doc-title{ font-size:14.5px; font-weight:700; }
+  .doc-title .ver{ font-family:var(--mono); font-size:11px; font-weight:400; color:var(--ink-faint); margin-left:6px; }
+  .doc-desc{ grid-column:1; font-size:13px; color:var(--ink-dim); }
+  .doc-path{ grid-column:1; font-family:var(--mono); font-size:10.5px; color:var(--ink-faint); margin-top:2px; }
+  .chip{
+    grid-row:1; grid-column:2; font-family:var(--mono); font-size:10px; letter-spacing:.04em;
+    padding:3px 9px; border-radius:20px; white-space:nowrap; align-self:start; margin-top:2px;
+  }
+  .chip.live{ background:var(--ok-bg); color:var(--ok); }
+  .chip.progress{ background:var(--live-bg); color:var(--live); }
+  .chip.plan{ background:var(--plan-bg); color:var(--plan); }
+  .chip.snap{ background:var(--snap-bg); color:var(--snap); }
+  .chip.arch{ background:var(--bg-sunk); color:var(--ink-faint); }
+
+  .no-match{ display:none; text-align:center; color:var(--ink-faint); font-size:13.5px; padding:30px 0; }
+
+  footer{
+    margin-top:56px; padding-top:18px; border-top:1px solid var(--line);
+    font-family:var(--mono); font-size:11px; color:var(--ink-faint);
+    display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px;
+  }
+  @media (max-width:560px){
+    a.doc{ grid-template-columns:1fr; }
+    .chip{ grid-row:auto; grid-column:1; justify-self:start; margin-top:4px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="eyebrow">Documentation Hub <span id="pageUpdated"></span></div>
+  <h1>MyRemember — 문서 모음</h1>
+  <p class="lede">로컬 우선 개인용 지식 관리 시스템 — vault 자동화(daily note, 링크 검증, 검색 인덱스, 백링크 그래프, 정적 웹뷰어) PRD와 실제 구현 현황.</p>
+  <a class="back" href="https://peter-cho-70.github.io/">← 문서 허브로 돌아가기</a>
+
+  <div class="filter-wrap">
+    <input id="filter" type="search" placeholder="문서 검색 — 제목·설명·키워드 입력" autocomplete="off">
+    <div class="filter-hint" id="count"></div>
+  </div>
+
+  <!-- ── 섹션 1: 시작하기 (루트) — README, STATUS, DEVLOG는 거의 모든 프로젝트에 고정으로 들어간다 ── -->
+  <section data-sec>
+    <h2>🚀 시작하기 <span class="folder">루트</span></h2>
+    <p class="section-desc">프로젝트 개요와 현재 개발 상태.</p>
+    <div class="doc-list">
+      <a class="doc" href="viewer.html?file=../README.md" data-tags="readme 개요 소개 실행방법">
+        <span class="doc-title">README — 프로젝트 개요·실행 방법</span>
+        <span class="chip live">현행</span>
+        <span class="doc-desc">저장소 최상위 소개 문서. 시스템 구성과 실행 방법.</span>
+        <span class="doc-path">README.md</span>
+      </a>
+      <a class="doc" href="viewer.html?file=STATUS.md" data-tags="현황 진행 상태 완료 미착수 status">
+        <span class="doc-title">개발 현황 (STATUS)</span>
+        <span class="chip live">현행</span>
+        <span class="doc-desc">완료 / 진행 중 / 알려진 이슈 — 항상 "현재 기준"으로 덮어써서 갱신.</span>
+        <span class="doc-path">doc/STATUS.md</span>
+      </a>
+      <a class="doc" href="viewer.html?file=DEVLOG.md" data-tags="devlog 개발 변천사 히스토리 타임라인">
+        <span class="doc-title">개발 기록 (DEVLOG)</span>
+        <span class="chip live">현행</span>
+        <span class="doc-desc">날짜별 개발 타임라인 — 새 항목은 맨 위/맨 아래에 계속 append.</span>
+        <span class="doc-path">doc/DEVLOG.md</span>
+      </a>
+      <!-- 필요하면 doc/IDEAS.md(아이디어 백로그) 카드도 이 자리에 추가 -->
+    </div>
+  </section>
+
+  <!-- ── 섹션 2: 기획·설계 (doc/spec/) — PRD, 요구사항 문서 ── -->
+  <section data-sec>
+    <h2>📐 기획 · 설계 <span class="folder">doc/spec/</span></h2>
+    <p class="section-desc">제품이 무엇이고 어디로 가는지를 정의하는 문서 — PRD와 실제 아키텍처.</p>
+    <div class="doc-list">
+      <a class="doc" href="viewer.html?file=spec/PRD.md" data-tags="prd 기획 요구사항 로드맵 phase argo crew">
+        <span class="doc-title">PRD <span class="ver">v1.0 · 2026-08-11</span></span>
+        <span class="chip plan">계획</span>
+        <span class="doc-desc">비전, Argo에서 영감받은 Crew 패턴, 핵심 요구사항, Phase 1~5 로드맵.</span>
+        <span class="doc-path">doc/spec/PRD.md</span>
+      </a>
+      <a class="doc" href="viewer.html?file=spec/ARCHITECTURE.md" data-tags="아키텍처 구조 스크립트 vault.py 설계원칙 crew 현황">
+        <span class="doc-title">ARCHITECTURE</span>
+        <span class="chip live">현행</span>
+        <span class="doc-desc">지금 실제로 어떻게 동작하는지 — 공통 모듈, 스크립트별 상세 동작, 설계 원칙, Crew 구현 현황표.</span>
+        <span class="doc-path">doc/spec/ARCHITECTURE.md</span>
+      </a>
+    </div>
+  </section>
+
+  <div class="no-match" id="no-match">검색 결과가 없습니다 — 다른 키워드로 시도해보세요.</div>
+
+  <footer>
+    <span>doc/ 통합 인덱스</span>
+  </footer>
+
+</div>
+<script>
+(function(){
+  var input = document.getElementById('filter');
+  var docs = Array.prototype.slice.call(document.querySelectorAll('a.doc'));
+  var secs = Array.prototype.slice.call(document.querySelectorAll('[data-sec]'));
+  var noMatch = document.getElementById('no-match');
+  var count = document.getElementById('count');
+  function apply(){
+    var q = input.value.trim().toLowerCase();
+    var shown = 0;
+    docs.forEach(function(d){
+      var text = (d.textContent + ' ' + (d.getAttribute('data-tags')||'')).toLowerCase();
+      var hit = !q || text.indexOf(q) !== -1;
+      d.style.display = hit ? '' : 'none';
+      if (hit) shown++;
+    });
+    secs.forEach(function(s){
+      var any = Array.prototype.some.call(s.querySelectorAll('a.doc'), function(d){ return d.style.display !== 'none'; });
+      s.style.display = any ? '' : 'none';
+    });
+    noMatch.style.display = shown ? 'none' : 'block';
+    count.textContent = q ? (shown + '개 문서 일치') : (docs.length + '개 문서');
+  }
+  input.addEventListener('input', apply);
+  apply();
+})();
+// 이 허브 페이지 자체의 최종 수정일 — 서버가 보내는 Last-Modified를 그대로 표시(하드코딩 방지).
+(function(){
+  var d = new Date(document.lastModified);
+  if (isNaN(d.getTime())) return;
+  var y = d.getFullYear(), m = String(d.getMonth()+1).padStart(2,'0'), day = String(d.getDate()).padStart(2,'0');
+  document.getElementById('pageUpdated').textContent = '· 최종 갱신 ' + y + '-' + m + '-' + day;
+})();
+</script>
+</body>
+</html>
