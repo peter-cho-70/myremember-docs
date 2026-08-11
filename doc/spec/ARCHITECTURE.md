@@ -46,8 +46,8 @@ PRD 3.2절의 crew 패턴 기준. `상태` 컬럼이 이 저장소의 실제 구
 | BacklinkMapper | 역참조 그래프(JSON) 생성 | `build-backlinks.py` | ✅ 구현 완료 |
 | (CLI 검색 도구) | ripgrep+fzf 인터랙티브 검색 | `search.sh` | ✅ 구현 완료 (PRD 표에는 크루가 아니지만 Phase 2 항목) |
 | HtmlPublisher | Pandoc+Jinja2로 정적 사이트 생성 | `generate-html.sh` → `generate-html.py` | ✅ 구현 완료 (GitHub Pages 배포는 보류 — 아래 참고) |
-| VersionKeeper | git 자동 커밋/태그/푸시 | `git-auto-commit.sh` | ⏳ 미구현 (Phase 4) |
-| BackupKeeper | Rclone + 로컬 압축 백업 | `backup.sh` | ⏳ 미구현 (Phase 4) |
+| VersionKeeper | git 자동 커밋/태그/푸시 | `git-auto-commit.sh` | ✅ 구현 완료 (push 실제 실행은 사용자 승인 대기) |
+| BackupKeeper | Rclone + 로컬 압축 백업 | `backup.sh` | ✅ 구현 완료 (rclone 설정·실제 클라우드 업로드는 대기) |
 
 ### LinkValidator 상세 동작
 
@@ -119,6 +119,35 @@ PRD 3.2절의 crew 패턴 기준. `상태` 컬럼이 이 저장소의 실제 구
 - "사이트맵"(PRD 3.2절 HtmlPublisher 규칙)은 별도 페이지 대신 홈페이지가 겸한다 —
   areas/topics/daily 전체 목록이 이미 홈에 있어서 중복 페이지를 만들지 않았다.
 
+### VersionKeeper 상세 동작 (`git-auto-commit.sh`)
+
+- 변경사항이 있으면(`git status --porcelain`) `git add -A` + `Daily update: {YYYY-MM-DD}` 커밋. 변경이
+  없으면 커밋을 건너뛴다(멱등, cron으로 매일 돌려도 안전).
+- 월간 태그(`v{YYYY-MM}`)는 "매달 1일에만 실행"이 아니라 "이번 달 태그가 로컬에 아직 없으면 생성"
+  조건으로 만든다 — 스케줄이 하루 밀려도 그 달의 태그가 누락되지 않는다.
+- **push는 기본적으로 하지 않는다.** `--push`를 줘야 시도하고, 그마저도 대화형 터미널(tty)에서는
+  `y/N` 확인을 한 번 더 받는다. tty가 없는 실행(cron 등)에서는 `--yes`를 명시하지 않는 한 push를
+  건너뛴다 — PRD 3.4절이 git push를 "승인 필요" 고위험 작업으로 분류하기 때문에, 무인 실행이
+  실수로 원격 저장소를 건드리지 않도록 막는 안전장치다.
+- 태그 push가 실패해도(이미 원격에 같은 태그가 있는 경우 등) 커밋 push 자체는 이미 끝난
+  상태이므로 스크립트를 실패시키지 않고 로그만 남긴다.
+
+### BackupKeeper 상세 동작 (`backup.sh`)
+
+- 로컬 압축 백업(`backups/{YYYY-MM}.tar.gz`)은 vault 밖으로 나가지 않는 저위험 작업이라 매번
+  자동으로 만든다. 대상은 원본(`areas/topics/daily`)과 그걸 만드는 `scripts/`, 루트 문서들이며,
+  재생성 가능한 `output/`과 `backups/` 자신, `.git`은 제외한다.
+- 분기 시작(1·4·7·10월 1일)에 실행되면 PRD 3.2절의 "외장 HDD 백업" 규칙을 로그로 상기시킨다
+  (자동화하지 않고 사람이 챙겨야 하는 일이라 리마인더만).
+- 클라우드 업로드는 `rclone` 설치 여부 → `config.yaml`의 `backup.rclone_remote` 설정 여부 →
+  `rclone listremotes`로 그 remote가 실제 구성돼 있는지를 순서대로 확인하고, 하나라도 없으면
+  이유를 로그로 남기고 조용히 스킵한다(스크립트를 실패시키지 않음 — 클라우드 백업은 선택 사항).
+- 모든 조건이 갖춰졌을 때만 `rclone copy`를 실행하며, VersionKeeper의 push와 동일한 패턴으로
+  대화형 확인(또는 `--yes`)을 거친다 — 클라우드 업로드도 PRD 3.4절의 승인 필요 작업이다.
+- `rclone`은 아직 이 환경에 설치되지 않았고, `rclone config`의 Google 계정 OAuth 인증은 브라우저가
+  필요해 사용자가 직접 완료해야 한다 — 그래서 이 스크립트는 "설정돼 있으면 쓰고, 아니면 안내만
+  하고 넘어간다"는 방어적인 구조로 짰다.
+
 ### GitHub Pages 배포는 보류함
 
 PRD는 GitHub Pages 배포를 요구하지만, 사용자와 상의 후 지금은 배포하지 않기로 했다.
@@ -131,8 +160,12 @@ Pages, 혹은 Tailscale 같은 사설 접근 방식)를 다시 결정한다.
 
 ## 승인이 필요한 작업 (PRD 3.4절)
 
-아직 구현되지 않았지만, 앞으로 아래 스크립트를 추가할 때는 실행 전 사용자 확인을 거친다:
-git 커밋/푸시(`VersionKeeper`), 클라우드 백업(`BackupKeeper`). 저위험 작업(`DailyScribe`,
-`LinkValidator`, `SearchIndexer`, `HtmlPublisher`)은 cron으로 승인 없이 자동 실행 가능하도록
-설계한다. 단 `HtmlPublisher`의 결과물을 인터넷에 공개하는 것(GitHub Pages 등 배포)은
-위에서 보듯 별도의 승인이 필요한 고위험 작업으로 취급한다.
+git 커밋/푸시(`VersionKeeper`)와 클라우드 백업(`BackupKeeper`)은 스크립트 차원에서 실행 전
+확인을 거치도록 구현했다(위 두 절 참고 — 기본은 로컬 동작만 하고, 원격에 손대는 부분은
+`--push`/클라우드 업로드 확인 프롬프트, 비대화형 실행은 `--yes` 없이는 건너뜀). 저위험 작업
+(`DailyScribe`, `LinkValidator`, `SearchIndexer`, `HtmlPublisher`, 로컬 백업)은 cron으로 승인
+없이 자동 실행 가능하도록 설계한다. `HtmlPublisher`의 결과물을 인터넷에 공개하는 것(GitHub
+Pages 등 배포)도 위에서 보듯 별도의 승인이 필요한 고위험 작업으로 취급한다.
+
+cron 등록, 실제 `--push`/클라우드 업로드 실행, `rclone config`(Google 계정 OAuth, 브라우저
+필요)는 아직 사용자가 진행하지 않았다 — 스크립트는 준비돼 있고 실행만 남은 상태.

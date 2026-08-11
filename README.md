@@ -11,13 +11,14 @@ daily note 자동 생성, `[[위키링크]]` 무결성 검사, SQLite 전문검�
 - **LinkValidator**: `[[노트]]` 링크 무결성 검사, 깨진/모호한 링크 리포트
 - **SearchIndexer / BacklinkMapper**: SQLite FTS5 전문검색 + `[[링크]]` 역참조 그래프(JSON)
 - **HtmlPublisher**: Pandoc+Jinja2로 홈/노트/태그/검색/다크모드를 갖춘 정적 웹뷰어 생성
-- (진행 중) **VersionKeeper / BackupKeeper**: git 자동 커밋·태그·push, 로컬 압축 백업 + rclone 클라우드 백업
+- **VersionKeeper / BackupKeeper**: git 자동 커밋·태그·push, 로컬 압축 백업 + rclone 클라우드 백업 (스크립트 구현 완료, 실제 push/클라우드 업로드 실행은 대기 중)
 
 Argo(AI 에이전트 플랫폼)의 "Crew" 개념에서 영감을 받아, 각 자동화 스크립트를 독립된 역할을
 가진 에이전트로 설계했다. 자세한 배경은 [PRD](doc/spec/PRD.md) 참고.
 
 ## 문서
 
+- [사용설명서 (User Guide)](doc/guide/USER_GUIDE.md) — 처음 시작하는 사람을 위한 설치·실행 순서 + 명령어 치트시트
 - [개발 현황 (STATUS)](doc/STATUS.md) — 완료된 기능, 진행 중인 작업, 알려진 이슈
 - [개발 기록 (DEVLOG)](doc/DEVLOG.md) — Phase별 타임라인: 무엇을 만들었고, 어떤 버그를 어떻게 고쳤는지
 - [PRD](doc/spec/PRD.md) — 제품 기획: 비전, 요구사항, Phase별 로드맵
