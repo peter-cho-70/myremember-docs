@@ -1,6 +1,6 @@
 # 개발 현황 (STATUS)
 
-> 기준일: 2026-08-13 — 이 문서는 append하지 않고 매번 "현재 기준"으로 덮어써서 갱신한다. 히스토리는 DEVLOG.md에 남긴다.
+> 기준일: 2026-08-14 — 이 문서는 append하지 않고 매번 "현재 기준"으로 덮어써서 갱신한다. 히스토리는 DEVLOG.md에 남긴다.
 
 ## ✅ 완료
 
@@ -391,18 +391,64 @@
     (`areas/{프로젝트}/README.md`+`progress.md`+`decisions.md`), Topics=끝이 없는 지속
     관심사. 지금 vault의 `areas/`는 비어 있고 콘텐츠가 전부 `topics/`에 있음 — 강제 사항은
     아니라고 안내.
+- **(2026-08-14) 캘린더 오늘 기준 재갱신 + 캘린더 탭에도 새로고침 안내 아이콘**: Google
+  Calendar MCP로 접근 가능한 캘린더 10개 전체를 다시 조회해 `dashboard-snapshot.json`을
+  오늘(08/14) 기준으로 갱신. Gmail 탭에만 있던 "새로고침 안내" 아이콘(hover 시 "Claude에게
+  갱신 요청" 툴팁)을 캘린더 탭에도 동일 패턴(`.side-tab-summary-row`+`.btn-icon`)으로
+  추가해 짝을 맞췄다. **Gmail은 이번엔 갱신 못 함** — Gmail MCP 커넥터 토큰이 만료되어
+  재인증 필요(claude.ai에서 Gmail 커넥터 재연결 후 다음 세션에서 갱신 가능). 자세한 내용은
+  DEVLOG 2026-08-14 "캘린더 오늘 기준 재갱신 + 캘린더 탭에도 새로고침 안내 아이콘" 참고.
+- **(2026-08-14) CADENCE 컨셉 검토 + daily note에 Phase 0 회고 4문항 추가**: 사용자가
+  만든 개인 프로젝트 컨셉 문서(`docs/cadence-concept.html`, 행동 축적형 개인 업무 OS)를
+  검토하고 개발 방향 의견 제공 — Phase 0(습관 검증)을 새 도구·저장소 없이 이 vault
+  안에서 시작하도록 권했고 사용자가 동의. `config.yaml`의 `daily_note.template`에
+  "CADENCE 회고 (Phase 0 검증)" 섹션(Q1~Q4)을 추가해 이후 모든 daily note에 자동
+  포함되게 함. 자세한 내용은 DEVLOG 2026-08-14 "CADENCE 컨셉 검토 + daily note에 Phase 0
+  회고 4문항 추가" 참고.
+- **(2026-08-14) "할 일을 스마트폰에 보내기" — 경량 클라우드 동기화**: 노트 하나 안 바뀌어도
+  전체 사이트를 재빌드+커밋+푸시해야 했던 기존 `build-cloud-site.py`와 달리, 새 스크립트
+  `scripts/sync-cloud-todos.py`는 `assets/todos-data.js` 파일 하나만 갱신해서 커밋+푸시한다
+  — 비밀번호 게이트(`gate-hash.js`)를 안 건드리므로 **`MYREMEMBER_CLOUD_PASSWORD`가 필요
+  없음**. `server.py`에 `POST /api/sync-cloud-todos`, 대시보드에 "할 일을 스마트폰에
+  보내기" 버튼 + 상태 텍스트 추가. **버그 2개 발견/수정**: ① 이 버튼이 readonly(배포된)
+  사이트에도 잘못 노출되던 것을 `{% if not readonly %}`로 숨김. ② 더 근본적으로,
+  `window.MYREMEMBER_TODOS` 스냅샷이 "그 기기가 그 날짜를 localStorage에 한 번도 연 적
+  없을 때만" 초기값으로 쓰이는 기존 설계 때문에, 폰이 이미 그 날짜를 한 번 열어본 뒤로는
+  PC가 아무리 새로 보내도 절대 반영되지 않는 문제를 발견 — `save_todos()`가 저장할 때마다
+  `synced_at` 타임스탬프를 `todos.json`에 같이 남기고, `dashboard.js`가 페이지 로드 시 이
+  값을 그 기기가 마지막으로 반영한 시각과 비교해서 더 새로우면 SNAPSHOT의 모든 날짜를
+  강제로 덮어쓰도록 수정(**"보내기"를 누른 뒤에는 PC 쪽이 우선** — 그 사이 폰에서 직접
+  체크/수정한 내용은 다음 새로고침 때 덮어써질 수 있음, 기존 "뷰어일 뿐 양방향 동기화
+  아님" 설계에서 한 단계 더 나아간 것). 자세한 내용은 DEVLOG 2026-08-14 "'할 일을
+  스마트폰에 보내기': 경량 클라우드 동기화 + 스냅샷 최초 1회 시딩 버그 발견/수정" 참고.
+- **(2026-08-14) 잘못 가져온 CADENCE 노트 정리**: 배포 전 점검 중 "노트 가져오기"로 만든
+  `topics/cadence-concept.md`가 실제로는 반도체/EDA 회사 "Cadence Design Systems"에 대한
+  브라우저 AI 탭 검색 결과(사용자가 실수로 붙여넣은 것)였음을 발견해 삭제, 나머지
+  `cadence-concept-v02.md`의 잘못된 자동 태그(`#LED #WS2812` 등 — 다른 노트에서 잘못
+  매칭된 것)를 `#CADENCE #업무관리 #컨셉설계`로 수정. 자세한 내용은 DEVLOG 2026-08-14
+  "잘못 가져온 CADENCE 노트 정리" 참고.
 
 ## 🚧 진행 중
 
 - Phase 4 스크립트(`git-auto-commit.sh`/`backup.sh`)는 작성 완료했지만 **실제 실행은 아직
   안 함** — `--push`와 클라우드 업로드는 사용자 승인 후 다음 세션에서. `rclone`도 아직 미설치
   (`rclone config`의 Google 계정 OAuth는 브라우저에서 사용자가 직접 완료해야 함)
-- **클라우드 배포 사이트(`myremember-vault`) 재배포 대기 중**: 2026-08-13 변경사항(할 일
-  기기 간 동기화, 메일·캘린더 폭 반응형, 노트 정렬 최신순, 캘린더 오늘 기준 갱신+내 캘린더
-  굵게)이 로컬 소스에는 반영됐지만 실제 배포된 사이트는 아직 예전 버전 — 사용자가 배포를
-  요청했으나 `MYREMEMBER_CLOUD_PASSWORD`가 이 환경 어디에도 없어 Claude가 대신 실행하지
-  못했다. 사용자에게 `MYREMEMBER_CLOUD_PASSWORD='...' python3 scripts/build-cloud-site.py
-  --push`를 직접 터미널에서 실행하도록 안내함 — 실행 여부/결과 미확인.
+- **클라우드 배포 사이트(`myremember-vault`) 재배포 한 번 더 필요**: 2026-08-13분 변경사항은
+  사용자가 08-14 세션 중 `build-cloud-site.py --push`로 실제 배포 확인함(로그에 16:09 커밋
+  확인). 다만 그 이후 만든 "할 일을 스마트폰에 보내기" 스냅샷 재적용 버그 수정(`synced_at`)과
+  CADENCE 노트 정리는 마지막 전체 배포(16:29)보다 **늦게**(16:35) 끝나서, 배포된 사이트에는
+  아직 정리 전 상태(잘못된 `cadence-concept.html` 포함)가 남아있다. 다음에
+  `MYREMEMBER_CLOUD_PASSWORD='...' python3 scripts/build-cloud-site.py --push`를 한 번 더
+  실행해야 최종 정리 상태가 반영된다.
+- **왼쪽 상단 버전 표시 + 최신 아이템 등록 시간 기능**: "프로그램이 업그레이드되거나 새
+  내용이 첨가되면 버전관리를 해줘. 왼쪽 상단에 날짜와 버전을 넣고, 최신 아이템 등록 시간도
+  표시해줘" 요청을 받았으나 조사(sidebar-head 위치 확인, NoteMeta.mtime 재사용 가능성 확인)
+  단계에서 다른 작업 요청("모바일 배포도 해줘", 문서 사이트 업데이트)으로 넘어가 구현 착수
+  전. 다음 세션에서 이어서 진행 필요 — 버전 파일(예: `scripts/webviewer/data/version.json`)
+  신설 + `sidebar-head`에 버전·날짜 표시 + 전체 노트 중 최신 `mtime` 계산해 "최신 등록"
+  시각 표시.
+- **Gmail MCP 재인증 필요**: 커넥터 토큰 만료로 08-14 세션에서 Gmail 스냅샷 갱신 실패.
+  claude.ai에서 Gmail 커넥터 재연결 필요.
 
 ## 🐞 알려진 이슈
 
@@ -437,6 +483,7 @@
   확인 후 커밋 필요
 - 관심종목 실데이터가 필요하면 실제 시세 API 연동(한국투자증권/키움 OpenAPI 등) 여부를
   사용자와 상의
-- **클라우드 배포 사이트(`myremember-vault`) 재배포**: 위 "진행 중" 참고 — 사용자가
-  `MYREMEMBER_CLOUD_PASSWORD`로 직접 `--push`를 실행하기를 기다리는 중. 다음 세션에서
-  결과 확인 필요(실패했으면 원인 파악)
+- **클라우드 배포 사이트(`myremember-vault`) 재배포**: 위 "진행 중" 참고 — CADENCE 노트
+  정리 이후분을 반영하는 재배포 한 번 더 필요
+- **왼쪽 상단 버전 표시 + 최신 아이템 등록 시간**: 위 "진행 중" 참고 — 다음 세션에서 구현
+- Gmail MCP 재인증 후 Gmail 스냅샷 갱신
