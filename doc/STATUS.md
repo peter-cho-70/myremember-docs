@@ -1,6 +1,6 @@
 # 개발 현황 (STATUS)
 
-> 기준일: 2026-08-14 — 이 문서는 append하지 않고 매번 "현재 기준"으로 덮어써서 갱신한다. 히스토리는 DEVLOG.md에 남긴다.
+> 기준일: 2026-08-15 — 이 문서는 append하지 않고 매번 "현재 기준"으로 덮어써서 갱신한다. 히스토리는 DEVLOG.md에 남긴다.
 
 ## ✅ 완료
 
@@ -427,28 +427,80 @@
   `cadence-concept-v02.md`의 잘못된 자동 태그(`#LED #WS2812` 등 — 다른 노트에서 잘못
   매칭된 것)를 `#CADENCE #업무관리 #컨셉설계`로 수정. 자세한 내용은 DEVLOG 2026-08-14
   "잘못 가져온 CADENCE 노트 정리" 참고.
+- **(2026-08-14) 사이드바 왼쪽 상단 버전 표시 + 최신 아이템 등록 시간**: "프로그램이
+  업그레이드되거나 새 내용이 첨가되면 버전관리를 해줘. 왼쪽 상단에 날짜와 버전을 넣고,
+  최신 아이템 등록 시간도 표시해줘" 요청 구현. `config.yaml`에 `app.version_path`
+  (`scripts/webviewer/data/version.json`, `{version, date, summary}`) 추가 — 기능을
+  추가/수정할 때마다 Claude가 이 파일을 갱신한다(이 vault는 작업이 미커밋 상태로 오래
+  쌓이는 경우가 많아 git 커밋 수 대신 별도 버전을 관리). `generate-html.py`에
+  `load_app_version()`/`latest_registered_item()`(vault 전체 노트 중 `mtime` 최신 1개,
+  Areas/Topics 정렬에 이미 쓰는 기준 재사용) 추가해 `base_ctx`로 모든 페이지에 전달.
+  `base.html`의 `sidebar-head`(48px 고정 높이 → 가변 높이로 변경)에 브랜드명 아래
+  "v1.0 · 2026-08-14"와 "최근 등록 {제목} · {시각}"(제목 클릭 시 그 노트로 이동, 넘치면
+  말줄임+hover 툴팁) 두 줄 추가. readonly(클라우드 배포본)에도 그대로 표시(정보 노출
+  성격상 굳이 숨길 이유 없음).
+- **(2026-08-14) 할 일 갱신 안 된다는 신고 조사 — 실제로는 정상**: "대시보드에 할일도
+  갱신되지 않았어"라는 신고를 받아 로컬 `todos.json`·배포된 `myremember-vault`의
+  `todos-data.js`·`dashboard.js`(스냅샷 재적용 로직 포함 여부)를 전부 대조 확인 —
+  `synced_at`·항목 14개 전부 로컬/배포 완전 일치, 로컬 화면도 정확히 반영됨을 확인. 코드
+  결함은 못 찾음 — GitHub Pages CDN 캐시(`max-age=600`)나 브라우저 캐시로 인한 일시적
+  표시 지연으로 추정, 사용자에게 새로고침 확인을 요청하고 원인 특정 대기 중(재현되면 다시
+  조사 필요).
+- **(2026-08-15) Gmail/캘린더 새로고침이 실제로 동작하도록 전환**: 클릭하면 "Claude에게
+  보낼 안내 문구를 클립보드에 복사"만 하던 방식(2026-08-14, MCP 도구는 Claude 세션
+  전용이라 로컬 서버 혼자서는 못 불러온다는 제약 때문)을 버리고, `server.py`가 `claude`
+  CLI를 `-p`(비대화형) subprocess로 직접 호출해 Gmail/Calendar MCP 도구로 실데이터를
+  가져와 `dashboard-snapshot.json`을 갱신하고 사이트를 재생성하는 방식으로 바꿨다.
+  `--allowedTools`로 필요한 MCP 도구 딱 두 개(Gmail: `list_labels`/`search_threads`,
+  캘린더: `list_calendars`/`list_events`)만 허용해서 다른 MCP 서버(Vercel/Drive 등)
+  스키마가 컨텍스트에 실리는 비용을 줄임(실측: 전체 로드 시 캐시 생성 42k 토큰 → 이
+  방식 13k). 새 엔드포인트 `POST /api/refresh-gmail`/`POST /api/refresh-calendar`,
+  버튼 클릭 시 잠금+아이콘 회전(`.btn-icon svg.spin`)으로 진행 중임을 보여주고 완료되면
+  자동 새로고침, 실패하면 버튼 아래에 이유 표시(claude CLI 미설치/미로그인 등). 도구
+  호출이 여러 번 필요해 1~3분 걸릴 수 있음. 두 버튼 모두 노트 편집/삭제 버튼과 같은
+  패턴으로 항상 보이되(`readonly` 여부로 안 숨김) 로컬 서버가 있을 때만 실제로 동작한다.
+  **Gmail MCP 재인증도 이번에 완료됨** — 2026-08-14 세션에 토큰 만료로 갱신이 막혀 있던
+  것이 해결되어, 이 버튼으로 직접 갱신한 오늘(08/15) 기준 스냅샷(받은편지함 3669통·
+  안읽음 2521통, 캘린더 3개·08/15~08/17)을 확인함(아래 "진행 중"의 재인증 항목은 이제
+  해소됨).
+- **(2026-08-15) DailyLogSync — daily note 자동 기록** (`scripts/sync-daily-log.py`
+  신설): daily note의 "진행 상황"/"관련 노트" 섹션에 그날 완료한 할 일과 그날
+  추가/수정된 노트(제목+태그)를 손으로 옮겨 적지 않아도 자동으로 채워 넣는다. 노트를
+  쓰거나 지우는 모든 경로(`rebuild_site`)와 할 일 저장 경로(`save_todos` — 무거운 사이트
+  전체 재생성 없이 이 파일만 가볍게 갱신) 양쪽에서 호출된다. HTML 주석 마커
+  (`<!-- auto:done-todos:start -->`/`<!-- auto:new-notes:start -->`)로 그 구간만
+  갈아끼우고, 마커 밖에 사용자가 직접 쓴 내용은 절대 건드리지 않는다. 대상 날짜의 daily
+  note가 없으면 `create-daily-note.py` 로직으로 먼저 만든다. `--date YYYY-MM-DD` 인자로
+  특정 날짜 백필도 가능.
+- **(2026-08-15) Tailscale로 폰에서 로컬 서버 바로 접속**: `server.py`가 기존
+  `127.0.0.1` 바인딩은 그대로 유지한 채, 이 기기에 Tailscale이 로그인돼 있으면 tailnet
+  IP(`100.x.y.z`)에도 추가로 바인딩(별도 스레드의 두 번째 `ThreadingHTTPServer`)해서
+  터미널에 `Tailscale로 폰 등 다른 기기에서: http://100.x.y.z:4500` 안내를 띄운다. 별도
+  배포(재빌드+커밋+푸시) 없이 저장하자마자 폰에도 바로 보이는 게 장점이고, 이 컴퓨터가
+  켜져 있고 `preview.sh`가 떠 있을 때만 동작한다(상시 서비스 아님). 일반 Wi-Fi의 다른
+  기기나 인터넷 전체에는 여전히 안 열려서, "127.0.0.1 전용"으로 지키려던 보안 의도(다른
+  기기가 vault에 못 쓰게)는 그대로 유지된다 — tailnet에 로그인된 기기만 닿을 수 있다.
+  사용법을 정리한 `topics/tailscale-사용자-매뉴얼.md` 노트도 같이 작성함.
+- **(2026-08-15) 신규 "사용법" 페이지** (`guide.html`, 사이드바 새 탭): 대시보드/노트/
+  검색/Daily 아카이브/관심종목·유튜브·카카오톡/Tailscale 폰 접속/기타 기능을 한 화면에
+  정리한 인앱 도움말. `readonly`(클라우드 배포본) 여부에 따라 안내 문구가 달라진다 —
+  배포본은 "조회 전용, 쓰기 기능 버튼 자체가 없음"을, 로컬 서버는 "이 화면의 모든 기능이
+  동작함"을 설명. `USER_GUIDE.md`와 내용은 겹치지만, 터미널 문서를 열지 않고 화면 안에서
+  바로 참고할 수 있게 하려는 목적.
 
 ## 🚧 진행 중
 
 - Phase 4 스크립트(`git-auto-commit.sh`/`backup.sh`)는 작성 완료했지만 **실제 실행은 아직
   안 함** — `--push`와 클라우드 업로드는 사용자 승인 후 다음 세션에서. `rclone`도 아직 미설치
   (`rclone config`의 Google 계정 OAuth는 브라우저에서 사용자가 직접 완료해야 함)
-- **클라우드 배포 사이트(`myremember-vault`) 재배포 한 번 더 필요**: 2026-08-13분 변경사항은
-  사용자가 08-14 세션 중 `build-cloud-site.py --push`로 실제 배포 확인함(로그에 16:09 커밋
-  확인). 다만 그 이후 만든 "할 일을 스마트폰에 보내기" 스냅샷 재적용 버그 수정(`synced_at`)과
-  CADENCE 노트 정리는 마지막 전체 배포(16:29)보다 **늦게**(16:35) 끝나서, 배포된 사이트에는
-  아직 정리 전 상태(잘못된 `cadence-concept.html` 포함)가 남아있다. 다음에
-  `MYREMEMBER_CLOUD_PASSWORD='...' python3 scripts/build-cloud-site.py --push`를 한 번 더
-  실행해야 최종 정리 상태가 반영된다.
-- **왼쪽 상단 버전 표시 + 최신 아이템 등록 시간 기능**: "프로그램이 업그레이드되거나 새
-  내용이 첨가되면 버전관리를 해줘. 왼쪽 상단에 날짜와 버전을 넣고, 최신 아이템 등록 시간도
-  표시해줘" 요청을 받았으나 조사(sidebar-head 위치 확인, NoteMeta.mtime 재사용 가능성 확인)
-  단계에서 다른 작업 요청("모바일 배포도 해줘", 문서 사이트 업데이트)으로 넘어가 구현 착수
-  전. 다음 세션에서 이어서 진행 필요 — 버전 파일(예: `scripts/webviewer/data/version.json`)
-  신설 + `sidebar-head`에 버전·날짜 표시 + 전체 노트 중 최신 `mtime` 계산해 "최신 등록"
-  시각 표시.
-- **Gmail MCP 재인증 필요**: 커넥터 토큰 만료로 08-14 세션에서 Gmail 스냅샷 갱신 실패.
-  claude.ai에서 Gmail 커넥터 재연결 필요.
+- **클라우드 배포 사이트(`myremember-vault`) 재배포 필요**: 2026-08-13분까지는 사용자가
+  08-14 세션 중 `build-cloud-site.py --push`로 실제 배포 확인함(로그에 16:09 커밋 확인).
+  그 이후 만든 "할 일을 스마트폰에 보내기" 스냅샷 재적용 버그 수정(`synced_at`)·CADENCE
+  노트 정리·버전 표시(08-14)와, 이번(08-15) DailyLogSync·사용법 페이지(`guide.html`)·
+  Gmail/캘린더 실시간 새로고침·Tailscale 안내(단, Tailscale 카드 자체는
+  `{% if not readonly %}`라 클라우드본에는 안 보임)가 전부 아직 반영 안 됨. 다음에
+  `MYREMEMBER_CLOUD_PASSWORD='...' python3 scripts/build-cloud-site.py --push`를 실행해야
+  최신 상태가 반영된다.
 
 ## 🐞 알려진 이슈
 
@@ -479,11 +531,12 @@
 - Phase 4 마무리: `rclone` 설치·`rclone config`(사용자가 직접), `config.yaml`에
   `backup.rclone_remote` 채우기, `git-auto-commit.sh --push`/`backup.sh` 실제 실행 승인
 - 실제 콘텐츠가 쌓이면 `build-search-index.py`/`build-backlinks.py`/`generate-html.sh`/`validate-links.py`를 주기적으로 돌려 최신 상태 유지
-- 로컬 저장소에 미커밋 변경사항 다수(UI 리디자인, 대시보드, Phase 4 스크립트 등) — 사용자
-  확인 후 커밋 필요
+- 로컬 저장소에 미커밋 변경사항 다수(UI 리디자인, 대시보드, Phase 4 스크립트, 이번(08-15)
+  DailyLogSync·Tailscale·Gmail/캘린더 새로고침·사용법 페이지 등) — 사용자 확인 후 커밋 필요
 - 관심종목 실데이터가 필요하면 실제 시세 API 연동(한국투자증권/키움 OpenAPI 등) 여부를
   사용자와 상의
-- **클라우드 배포 사이트(`myremember-vault`) 재배포**: 위 "진행 중" 참고 — CADENCE 노트
-  정리 이후분을 반영하는 재배포 한 번 더 필요
-- **왼쪽 상단 버전 표시 + 최신 아이템 등록 시간**: 위 "진행 중" 참고 — 다음 세션에서 구현
-- Gmail MCP 재인증 후 Gmail 스냅샷 갱신
+- **클라우드 배포 사이트(`myremember-vault`) 재배포**: 위 "진행 중" 참고 — 08-14~08-15분
+  변경사항까지 반영하는 재배포 필요(`MYREMEMBER_CLOUD_PASSWORD` 있어야 함, Claude는 실행
+  불가)
+- 기능 추가/수정할 때마다 `scripts/webviewer/data/version.json` 갱신하는 걸 습관화(이번
+  세션에도 아직 반영 안 됨 — 다음에 이어서 갱신)

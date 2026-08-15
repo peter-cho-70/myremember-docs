@@ -1420,3 +1420,139 @@
 - **추가/변경**: 사용자에게 확인 질문 후 "잘못된 것 삭제 + 태그 수정"으로 진행.
   `topics/cadence-concept.md` 삭제, `cadence-concept-v02.md`의 태그를
   `#CADENCE #업무관리 #컨셉설계`로 교체. 백링크/사이트 재생성.
+
+## 2026-08-14 — myremember-docs 문서 사이트 갱신 + Pages 빌드 실패 버그 발견/수정
+
+- **배경**: 사용자가 공개 문서 사이트(https://peter-cho-70.github.io/myremember-docs/doc/index.html)
+  업데이트를 요청. `docs/STATUS.md`/`DEVLOG.md`/`guide/USER_GUIDE.md`를 이날 작업분까지
+  갱신하고 `../myremember-docs` 체크아웃에 복사→커밋→푸시.
+- **버그 발견**: 푸시 후 Pages 빌드 상태를 확인하니 `status: "errored"` — 실제 라이브
+  사이트를 열어보니 `기준일: 2026-08-11`로 사흘 전 상태에 멈춰 있었다. 원인: 이 저장소에
+  `.nojekyll`이 없어서 GitHub Pages가 Jekyll로 빌드를 시도하는데, `STATUS.md`/`DEVLOG.md`
+  본문에 이 프로젝트의 Jinja2 템플릿 문법을 그대로 인용한 부분(`{% if not readonly %}`,
+  `{{ m.url }}` 등)이 Jekyll의 Liquid 엔진 문법과 겹쳐서 파싱에 실패하고 있었다 —
+  2026-08-13 푸시(커밋 `e916e3e`)부터 두 번 연속 빌드 실패, 아무도 눈치채지 못한 채
+  이틀간 사이트가 정체돼 있었음.
+- **버그 수정**: 저장소 루트에 빈 `.nojekyll` 파일 추가 → Jekyll 처리를 건너뛰고 정적
+  파일 그대로 서빙하도록 변경. 커밋+푸시 후 `gh api .../pages/builds/latest`로 빌드
+  성공(`status: "built"`) 확인, 라이브 `doc/STATUS.md`에 `기준일: 2026-08-14`가 실제로
+  반영된 것까지 `curl`로 재확인.
+- **참고**: 이 프로젝트의 문서 사이트 템플릿(`~/.claude/templates/project-docs-site/`)이
+  다른 프로젝트에도 재사용되므로, 같은 템플릿을 쓴 다른 문서 사이트(stockdashboard-docs
+  등)에도 `.nojekyll`이 있는지 다음에 확인해볼 가치가 있음(이번 세션에서는 확인 안 함).
+
+## 2026-08-14 — 사이드바 왼쪽 상단 버전 표시 + 최신 아이템 등록 시간
+
+- **배경**: "새롭게 프로그램이 업그레이드 되거나 새로운 내용이 첨가되면, 버전관리를
+  해줘. 왼쪽 상단에 날짜와 버전을 넣고, 최신 아이템 등록 시간도 표시해줘". 이 vault는
+  git 커밋 없이 오래 작업이 쌓이는 경우가 많아(이 세션도 마찬가지) 커밋 수를 버전으로
+  쓰기 어려워, 별도 버전 파일을 두기로 했다.
+- **추가/변경**: `config.yaml`에 `app.version_path`
+  (`scripts/webviewer/data/version.json`, `{version, date, summary}`) 추가.
+  `generate-html.py`에 `load_app_version()`(파일 읽기)과
+  `latest_registered_item()`(vault 전체 `NoteMeta` 중 `mtime` 최댓값 1개 — Areas/Topics
+  최신순 정렬에 이미 쓰는 기준을 그대로 재사용) 추가해 `base_ctx`(모든 페이지 공통
+  렌더 컨텍스트)에 실어 보낸다. `base.html`의 `sidebar-head`를 고정 48px 높이에서
+  가변 높이로 바꾸고, 브랜드명 아래 "v1.0 · 2026-08-14"와 "최근 등록 {제목} · {시각}"
+  (제목 클릭 시 해당 노트로 이동, `title` 속성으로 hover 시 전체 제목 확인 가능) 두 줄을
+  추가. `.brand-info`(세로 flex)/`.brand-meta`(작은 폰트, 사이드바 전경색 55% 불투명도)
+  CSS 신설. `readonly`(클라우드 배포본) 여부와 무관하게 항상 표시 — 정보 노출 성격상
+  굳이 숨길 이유가 없다고 판단.
+- **운영 방침**: 이 `version.json`은 기능을 추가/수정할 때마다 Claude가 갱신한다 —
+  git 커밋과는 독립적인 버전이다(STATUS.md "다음 우선순위"에 습관화 항목으로 남겨둠).
+- **검증**: 로컬 서버 재시작 후 Playwright로 실제 사이드바에 "v1.0 · 2026-08-14"와
+  "최근 등록 …" 줄이 렌더링되고, 최근 등록 링크가 실제로 해당 노트로 연결되는 것까지
+  스크린샷으로 확인.
+
+## 2026-08-14 — 할 일 갱신 안 된다는 신고 조사 (코드 결함 못 찾음)
+
+- **배경**: "대시보드에 할일도 갱신되지 않았어. 수정해줘"라는 신고.
+- **조사**: 로컬 `scripts/webviewer/data/todos.json`, 로컬 서버 프로세스 시작 시각 대
+  소스 파일 mtime, 배포된 `myremember-vault-deploy`의 `assets/todos-data.js`·
+  `dashboard.js`(스냅샷 재적용 로직 `SNAPSHOT_APPLIED_KEY` 포함 여부), 실제 라이브
+  GitHub Pages URL(`curl`로 직접 fetch, 캐시 헤더 포함)까지 전부 대조했다. 결과: 로컬과
+  배포본의 `synced_at`(16:21:04)과 오늘 항목 14개가 완전히 일치했고, 로컬 화면도
+  Playwright 스크린샷으로 실제 반영 상태를 확인함 — 재현되는 코드 결함을 찾지 못했다.
+- **추정 원인**: 라이브 사이트 응답 헤더에 `cache-control: max-age=600`이 있어 GitHub
+  Pages CDN이 최대 10분 캐시한다 — 사용자가 확인한 시점이 재배포 직후였다면 이 캐시나
+  브라우저 자체 캐시 때문에 일시적으로 예전 상태가 보였을 가능성이 높다.
+- **이슈/막힌 점**: 사용자가 정확히 어느 화면(로컬 PC/배포된 사이트, 어느 기기)에서
+  무엇이 안 보였는지 특정하지 못한 채로 남아있다 — 새로고침 후에도 재현되면 다음
+  세션에서 구체적인 화면/기기를 짚어 다시 조사 필요.
+
+## 2026-08-15 — Gmail/캘린더 새로고침 버튼이 실제로 데이터를 다시 불러오도록 전환
+
+- **배경**: 2026-08-14에 만든 새로고침 아이콘은 클릭하면 "대시보드 스냅샷 갱신해줘"라는
+  안내 문구를 클립보드에 복사하는 것까지만 했다 — Gmail/Calendar MCP 도구가 Claude 세션
+  안에서만 쓸 수 있어서, 정적/로컬 서버 혼자서는 직접 다시 불러올 방법이 없다고 판단했기
+  때문. 이번에는 `server.py`가 `claude` CLI(이미 로그인된 이 컴퓨터의 구독)를 `-p`
+  비대화형 subprocess로 직접 호출해서, 클릭 한 번으로 실제 데이터를 가져오는 방식으로
+  바꿨다.
+- **구현**: `_run_claude_cli()`(subprocess 실행 공용 헬퍼, `ask_claude()`가 쓰던 로직을
+  뽑아냄 — stdin을 `DEVNULL`로 막지 않으면 매 호출마다 "no stdin data received in 3s"
+  경고와 함께 3초씩 날아가는 걸 실측으로 발견)와 `_run_claude_for_json()`(MCP
+  `--allowedTools` 지정 + JSON 파싱, 마크다운 코드펜스 제거)을 새로 추가하고
+  `refresh_gmail_snapshot()`/`refresh_calendar_snapshot()`이 각각 이 헬퍼로 프롬프트를
+  던져 `dashboard-snapshot.json`의 해당 섹션만 갈아끼운 뒤 `generate-html.py`를
+  재실행한다. `--allowedTools`는 Gmail은 `list_labels`/`search_threads`, 캘린더는
+  `list_calendars`/`list_events` 딱 두 개씩만 허용 — `ask_claude()`처럼
+  `--strict-mcp-config`를 쓰지 않는데, 이유는 Gmail/Calendar MCP 커넥터가 이 세션의
+  기본 MCP 설정에만 있고 별도 `--mcp-config`로 재선언하면 인증이 안 붙는 걸 실측으로
+  확인했기 때문(재선언 시 도구 자체를 못 찾음). 대신 `--allowedTools`로 범위를 좁혀 다른
+  MCP 서버(Vercel/Drive 등) 도구 스키마가 컨텍스트에 실리는 비용을 최대한 줄인다(실측:
+  전체 로드 시 캐시 생성 42k 토큰 → 이 방식 13k). 새 엔드포인트
+  `POST /api/refresh-gmail`/`POST /api/refresh-calendar` 추가. `dashboard.js`의
+  `wireRefreshHintButton()`(클립보드 복사)을 `wireRefreshButton()`(fetch로 엔드포인트
+  호출, 성공 시 `window.location.reload()`)으로 교체하고, 버튼에 `.btn-icon svg.spin`
+  CSS 애니메이션으로 진행 중 표시(비활성화+아이콘 회전), 실패하면 버튼 아래 상태
+  텍스트에 이유를 보여준다.
+- **검증**: 이 버튼으로 직접 Gmail/캘린더를 갱신해서 `dashboard-snapshot.json`이
+  2026-08-15 기준으로 실제 바뀐 것을 확인(받은편지함 3669통·안읽음 2521통, 캘린더
+  3개·08/15~08/17 일정). 이 과정에서 2026-08-14 STATUS.md에 남아있던 "Gmail MCP
+  재인증 필요" 항목도 자연히 해소됨을 확인(커넥터가 이미 재연결돼 있었음).
+
+## 2026-08-15 — DailyLogSync: daily note에 완료한 할 일·새 노트 자동 기록
+
+- **배경**: daily note 템플릿의 "진행 상황"/"관련 노트" 섹션을 매번 손으로 옮겨 적어야
+  했던 것을, 이미 다른 곳에 있는 데이터(할 일 위젯의 `done` 상태, vault 노트 파일의
+  mtime)로 자동 채우기로 함.
+- **구현**: 새 모듈 `scripts/sync-daily-log.py`의 `sync_daily_log(config, target_date,
+  logger)`가 ① `scripts/webviewer/data/todos.json`에서 그 날짜의 `done=true` 항목 텍스트,
+  ② `daily/`를 제외한 노트 디렉터리(areas/topics) 중 파일 mtime이 그 날짜인 것의 제목
+  (`[[wikilink|제목]]`)+태그를 모아, daily note 안 HTML 주석 마커
+  (`<!-- auto:done-todos:start/end -->`, `<!-- auto:new-notes:start/end -->`) 사이의
+  내용만 갈아끼운다. 마커가 아직 없으면 해당 `## 진행 상황`/`## 관련 노트` 헤딩의 기본
+  플레이스홀더(`-`)를 대체하거나, 헤딩 자체가 없으면 파일 끝에 새 섹션으로 추가 — 마커
+  밖에 사용자가 직접 쓴 내용은 어떤 경로로도 건드리지 않는다. 노트 참고용으로 적는
+  태그는 `#`을 안 붙이고 괄호로만 표기하는데, `extract_tags()`가 daily note 본문
+  전체를 정규식(`#단어`)으로 훑어서 실제 `#`을 붙이면 daily note 자신이 그 태그의
+  페이지에도 노출되는 문제(실제로 겪음: TDF 노트를 링크했더니 daily note가 `#TDF`
+  태그 페이지에 나타남)를 피하기 위함. `server.py`의 `rebuild_site()`(노트를 쓰거나
+  지우는 모든 경로가 거침)와 `save_todos()`(할 일 저장 — 무거운 사이트 전체 재생성
+  없이 이 파일 하나만) 양쪽에서 호출하도록 연결.
+- **검증**: 오늘 daily note(`daily/2026-08-15.md`)에 실제로 완료한 할 일과 오늘
+  추가/수정된 노트가 마커 구간에 채워지는 것을 확인. 재실행해도 마커 밖 내용(예: "진행
+  상황" 맨 위에 손으로 적은 메모)이 그대로 유지되는지 확인.
+
+## 2026-08-15 — Tailscale로 폰에서 로컬 서버 바로 접속 + 사용법 페이지 신설
+
+- **배경**: 지금까지 웹뷰어를 폰에서 보려면 `myremember-vault`(비밀번호 게이트 클라우드
+  배포본)를 다시 빌드+커밋+푸시해야 했다 — 저장할 때마다 바로 폰에서 보고 싶다는
+  요구에는 배포 절차가 너무 무겁다. Tailscale(WireGuard 기반 메시 VPN, 같은 계정으로
+  로그인한 기기끼리 사설망으로 묶어줌)이 이미 이 컴퓨터에 설치돼 있어서, 로컬 서버를
+  tailnet IP에도 열어주는 쪽으로 방향을 잡았다.
+- **구현**: `server.py`의 `main()`이 기존 `127.0.0.1` 바인딩(`ThreadingHTTPServer`)은
+  그대로 두고, `_tailscale_ipv4()`(`tailscale ip -4`를 subprocess로 호출, 없거나
+  타임아웃/미로그인이면 `None`)가 IP를 돌려주면 그 IP로 두 번째 `ThreadingHTTPServer`를
+  만들어 별도 데몬 스레드에서 `serve_forever()`한다. 바인딩 실패(포트 충돌 등)는
+  `OSError`를 잡아 안내만 하고 기본 서버는 계속 동작. 종료 시(`KeyboardInterrupt`)
+  두 서버 모두 정리. **보안 성격은 그대로 유지**: 여전히 일반 Wi-Fi의 다른 기기나
+  인터넷 전체에는 안 열리고, 같은 tailnet에 로그인된 기기(내 폰)만 닿을 수 있어서
+  "127.0.0.1 전용으로 다른 기기가 vault에 못 쓰게 한다"는 기존 의도가 깨지지 않는다.
+  같이 만든 `guide.html`(사이드바 새 "사용법" 탭, `generate-html.py`에 렌더링 추가)에
+  이 기능 설명과 최초 설정 방법(맥/폰 Tailscale 설치+로그인)을 카드로 추가했고,
+  `topics/tailscale-사용자-매뉴얼.md`에 Tailscale 자체에 대한 종합 사용자 매뉴얼(설치·
+  CLI·MagicDNS·Subnet Router·Exit Node·Taildrop·Serve/Funnel·ACL 등)도 별도로 작성.
+- **검증**: `tailscale ip -4`로 이 기기의 tailnet IP(`100.91.22.87`)를 확인. `guide.html`
+  이 `readonly` 여부에 따라 Tailscale 카드를 숨기는지(`{% if not readonly %}`, 클라우드
+  배포본에는 로컬 전용 기능이라 안 보여야 함)와 로컬 서버에서는 보이는지 템플릿 조건 확인.
